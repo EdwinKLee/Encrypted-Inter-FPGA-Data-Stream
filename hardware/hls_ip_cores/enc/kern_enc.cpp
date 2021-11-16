@@ -5,18 +5,16 @@
 
 
 void kern_enc(short id,
-   galapagos_interface * in,
-   galapagos_interface * out) 
+              galapagos_interface * in,
+              galapagos_interface * out)
 {
-    #pragma HLS_DATAFLOW
-    #pragma HLS INTERFACE ap_ctrl_none port=return
-    #pragma HLS INTERFACE axis register both port=out
-    #pragma HLS INTERFACE axis register both port=in
-    /*#pragma HLS resource core=AXI4Stream variable=in
-    #pragma HLS resource core=AXI4Stream variable=out*/
-
+#pragma HLS_DATAFLOW
+#pragma HLS INTERFACE ap_ctrl_none port=return
+#pragma HLS INTERFACE axis register both port=out
+#pragma HLS INTERFACE axis register both port=in
+    
     const static DATA_TYPE RC[] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
-   
+    
     const static DATA_TYPE SBOX[256] = {
         0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
         0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -34,7 +32,7 @@ void kern_enc(short id,
         0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
         0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
         0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16};
-
+    
     //
     // temporary variables used within the module
     DATA_TYPE i, j, m, n, temp, tmp_;
@@ -44,276 +42,221 @@ void kern_enc(short id,
     DATA_TYPE last4bytes[AES_COL_SIZE]; // used in the key schedule stage
     DATA_TYPE lastround[AES_BLOCK_SIZE]; // used in the key schedule stage
     
-    //if (!in->empty() && !out->full()) {
-
-            //
-            // store the plain text onto on-chip memories
-            DATA_TYPE plain_block[AES_BLOCK_SIZE]; // plain text; size = 16
-            //
-            // key schedule stage, generating the round keys
-            static DATA_TYPE keys[AES_ROUND_KEY_SIZE]; // round keys; size = 176
-
-
+    //
+    // store the plain text onto on-chip memories
+    DATA_TYPE plain_block[AES_BLOCK_SIZE]; // plain text; size = 16
+    //
+    // key schedule stage, generating the round keys
+    static DATA_TYPE keys[AES_ROUND_KEY_SIZE]; // round keys; size = 176
+    
+    
 #pragma HLS array_partition variable=keys complete
-
-           // gp = in->read();
-
-           static IN keyT, plainT;
-
-           static int flag = 0;
-           size_t size;
-            short dest, src;
-           if (flag < 2)
-           {
-        	   if (!in->empty()) {
-                // T * read_data = (T *)in->packet_read(&size, &dest, &src);
-                galapagos_packet data;
-                data = in->read();
-                src = data.id;
-
-                if (src == 0) {
-                    plainT = (ap_uint<128>)data.data;
-
-                    /*galapagos_packet data;
-                    data.dest = 0;
-                    data.id = 3;
-                    data.keep = KEEP_ALL;
-                    data.last = 1;
-                    data.data = 0x301;
-                    out->write(data);
-                    galapagos_packet data1;
-                    data1.dest = 0;
-                    data1.id = 3;
-                    data1.keep = KEEP_ALL;
-                    data1.last = 1;
-                    data1.data = plainT;
-                    out->write(data1);*/
-
-                    flag = flag + 1;
-                }
-                if (src == 1) {
-                    keyT = (ap_uint<128>)data.data;
-
-                    /*galapagos_packet data;
-                    data.dest = 0;
-                    data.id = 3;
-                    data.keep = KEEP_ALL;
-                    data.last = 1;
-                    data.data = 0x302;
-                    out->write(data);
-                    galapagos_packet data1;
-                    data1.dest = 0;
-                    data1.id = 3;
-                    data1.keep = KEEP_ALL;
-                    data1.last = 1;
-                    data1.data = keyT;
-                    out->write(data1);*/
-
-                    flag = flag + 1;
-                }
-        	   }
-           }
-           else if (flag == 2){
-           
-
-           /*******************************************************************/
-           // if(gp.id == 0) {
-               //IO_DATA_TYPE keyT = key.read();
-               // IN plainT = (gp.data)(127,0);
-            //    IN keyT ("0f1571c947d9e8590cb7add6af7f6798", 16);
-               Lp2:for (i = AES_BLOCK_SIZE; i > 0 ; --i) {
+    
+    
+    static IN keyT, plainT;
+    
+    static int flag = 0;
+    size_t size;
+    short dest, src;
+    if (flag < 2)
+    {
+        if (!in->empty()) {
+            
+            galapagos_packet data;
+            data = in->read();
+            src = data.id;
+            
+            if (src == 0) {
+                plainT = (ap_uint<128>)data.data;
+                
+                flag = flag + 1;
+            }
+            if (src == 1) {
+                keyT = (ap_uint<128>)data.data;
+                
+                flag = flag + 1;
+            }
+        }
+    }
+    else if (flag == 2){
+        
+    Lp2:for (i = AES_BLOCK_SIZE; i > 0 ; --i) {
 #pragma HLS unroll
-                   keys[i - 1] = keyT & 0xff;
-                   keyT >>= 8;
-               }
-
-               Lp3:for (i = 0; i < AES_ROUNDS; ++i) {
+        keys[i - 1] = keyT & 0xff;
+        keyT >>= 8;
+    }
+        
+    Lp3:for (i = 0; i < AES_ROUNDS; ++i) {
 #pragma HLS unroll
-
-                   temp = (i*16);
-                   tmp_ = (i+1)*16;
-
-                   last4bytes[0] = keys[temp + 12];
-                   last4bytes[1] = keys[temp + 13];
-                   last4bytes[2] = keys[temp + 14];
-                   last4bytes[3] = keys[temp + 15];
-                   
-                   // k0-k3 for next round
-                   temp_column[3] = SBOX[last4bytes[0]];
-                   temp_column[0] = SBOX[last4bytes[1]];
-                   temp_column[1] = SBOX[last4bytes[2]];
-                   temp_column[2] = SBOX[last4bytes[3]];
-                   temp_column[0] ^= RC[i];
-
-                   Lp4:for (j = 0; j < AES_BLOCK_SIZE; ++j) {
+        
+        temp = (i*16);
+        tmp_ = (i+1)*16;
+        
+        last4bytes[0] = keys[temp + 12];
+        last4bytes[1] = keys[temp + 13];
+        last4bytes[2] = keys[temp + 14];
+        last4bytes[3] = keys[temp + 15];
+        
+        // k0-k3 for next round
+        temp_column[3] = SBOX[last4bytes[0]];
+        temp_column[0] = SBOX[last4bytes[1]];
+        temp_column[1] = SBOX[last4bytes[2]];
+        temp_column[2] = SBOX[last4bytes[3]];
+        temp_column[0] ^= RC[i];
+        
+    Lp4:for (j = 0; j < AES_BLOCK_SIZE; ++j) {
 #pragma HLS unroll
-                       lastround[j] = keys[temp + j];
-                   }
-
-                   keys[tmp_] = temp_column[0] ^ lastround[0];
-                   keys[tmp_ + 1] = temp_column[1] ^ lastround[1];
-                   keys[tmp_ + 2] = temp_column[2] ^ lastround[2];
-                   keys[tmp_ + 3] = temp_column[3] ^ lastround[3];
-                   // k4-k7 for next round
-                   keys[tmp_ + 4] = keys[tmp_] ^ lastround[4];
-                   keys[tmp_ + 5] = keys[tmp_ + 1] ^ lastround[5];
-                   keys[tmp_ + 6] = keys[tmp_ + 2] ^ lastround[6];
-                   keys[tmp_ + 7] = keys[tmp_ + 3] ^ lastround[7];
-                   // k8-k11 for next round
-                   keys[tmp_ + 8] = keys[tmp_ + 4] ^ lastround[8];
-                   keys[tmp_ + 9] = keys[tmp_ + 5] ^ lastround[9];
-                   keys[tmp_ + 10] = keys[tmp_ + 6] ^ lastround[10];
-                   keys[tmp_ + 11] = keys[tmp_ + 7] ^ lastround[11];
-                   // k12-k15 for next round
-                   keys[tmp_ + 12] = keys[tmp_ + 8] ^ lastround[12];
-                   keys[tmp_ + 13] = keys[tmp_ + 9] ^ lastround[13];
-                   keys[tmp_ + 14] = keys[tmp_ + 10] ^ lastround[14];
-                   keys[tmp_ + 15] = keys[tmp_ + 11] ^ lastround[15];
-               }
-           // }
-
-
-           /*******************************************************************/
-           // else if(gp.id == 4){
-           /*IN plainT = in.read();*/
-               // IN plainT = (gp.data)(127,0);
-            //    IN plainT ("0123456789abcdeffedcba9876543210", 16);
-               Lp1:for (i = AES_BLOCK_SIZE; i > 0 ; --i) {
+        lastround[j] = keys[temp + j];
+    }
+        
+        keys[tmp_] = temp_column[0] ^ lastround[0];
+        keys[tmp_ + 1] = temp_column[1] ^ lastround[1];
+        keys[tmp_ + 2] = temp_column[2] ^ lastround[2];
+        keys[tmp_ + 3] = temp_column[3] ^ lastround[3];
+        // k4-k7 for next round
+        keys[tmp_ + 4] = keys[tmp_] ^ lastround[4];
+        keys[tmp_ + 5] = keys[tmp_ + 1] ^ lastround[5];
+        keys[tmp_ + 6] = keys[tmp_ + 2] ^ lastround[6];
+        keys[tmp_ + 7] = keys[tmp_ + 3] ^ lastround[7];
+        // k8-k11 for next round
+        keys[tmp_ + 8] = keys[tmp_ + 4] ^ lastround[8];
+        keys[tmp_ + 9] = keys[tmp_ + 5] ^ lastround[9];
+        keys[tmp_ + 10] = keys[tmp_ + 6] ^ lastround[10];
+        keys[tmp_ + 11] = keys[tmp_ + 7] ^ lastround[11];
+        // k12-k15 for next round
+        keys[tmp_ + 12] = keys[tmp_ + 8] ^ lastround[12];
+        keys[tmp_ + 13] = keys[tmp_ + 9] ^ lastround[13];
+        keys[tmp_ + 14] = keys[tmp_ + 10] ^ lastround[14];
+        keys[tmp_ + 15] = keys[tmp_ + 11] ^ lastround[15];
+    }
+        
+    Lp1:for (i = AES_BLOCK_SIZE; i > 0 ; --i) {
 #pragma HLS unroll
-                   plain_block[i - 1] = plainT & 0xff;
-                   plainT >>= 8;
-               }
-
-           //
-           // first add round key stage
-               Lp5:for (i = 0; i < AES_BLOCK_SIZE; ++i ) {
+        plain_block[i - 1] = plainT & 0xff;
+        plainT >>= 8;
+    }
+        
+        //
+        // first add round key stage
+    Lp5:for (i = 0; i < AES_BLOCK_SIZE; ++i ) {
 #pragma HLS unroll
-                   cipher[i] = plain_block[i] ^ keys[i];
-               }
-
-           //
-           // 9 rounds of AES encryption algorithm
-               Lp6:for (j = 1; j < AES_ROUNDS ; ++j) {
+        cipher[i] = plain_block[i] ^ keys[i];
+    }
+        
+        //
+        // 9 rounds of AES encryption algorithm
+    Lp6:for (j = 1; j < AES_ROUNDS ; ++j) {
 #pragma HLS pipeline
-
-           //
-           // subtitute bytes stage
-                   Lp7:for (i = 0; i < AES_BLOCK_SIZE; ++i) {
-                       temp_state[i] = SBOX[cipher[i]];
-                   }
-
-           //
-           // shift rows stage
-           // row1
-                   temp        = temp_state[1];
-                   temp_state[1]  = temp_state[5];
-                   temp_state[5]  = temp_state[9];
-                   temp_state[9]  = temp_state[13];
-                   temp_state[13] = temp;
-           // row2
-                   temp        = temp_state[2];
-                   temp_state[2]  = temp_state[10];
-                   temp_state[10] = temp;
-                   temp        = temp_state[6];
-                   temp_state[6]  = temp_state[14];
-                   temp_state[14] = temp;
-           // row3
-                   temp        = temp_state[15];
-                   temp_state[15] = temp_state[11];
-                   temp_state[11] = temp_state[7];
-                   temp_state[7]  = temp_state[3];
-                   temp_state[3]  = temp;
-
-           //
-           // mix columns stage
-                   Lp8:for (m = 0; m < AES_BLOCK_SIZE; m += 4) {
-                       temp_column[0] = temp_state[m];
-                       temp_column[1] = temp_state[m + 1];
-                       temp_column[2] = temp_state[m + 2];
-                       temp_column[3] = temp_state[m + 3];
-
-                       Lp9:for (n = 0; n < AES_COL_SIZE; ++n) {
-                           temp_column_a[n] = temp_column[n];
-                           if (temp_column[n] & 0x80) {
-                            temp_column_b[n] = (temp_column[n] << 1) ^ 0x1b;
-                        } else {
-                            temp_column_b[n] = (temp_column[n] << 1);
-                        }
-//            temp_column_b[n] = (temp_column[n] & 0x80) ? ((temp_column[n] << 1) ^ 0x1b) : (temp_column[n] << 1);
-                    }
-
-           temp_column[0] = temp_column_b[0] ^ temp_column_a[3] ^ temp_column_a[2] ^ temp_column_b[1] ^ temp_column_a[1]; /* 2 * a0 + a3 + a2 + 3 * a1 */
-           temp_column[1] = temp_column_b[1] ^ temp_column_a[0] ^ temp_column_a[3] ^ temp_column_b[2] ^ temp_column_a[2]; /* 2 * a1 + a0 + a3 + 3 * a2 */
-           temp_column[2] = temp_column_b[2] ^ temp_column_a[1] ^ temp_column_a[0] ^ temp_column_b[3] ^ temp_column_a[3]; /* 2 * a2 + a1 + a0 + 3 * a3 */
-           temp_column[3] = temp_column_b[3] ^ temp_column_a[2] ^ temp_column_a[1] ^ temp_column_b[0] ^ temp_column_a[0]; /* 2 * a3 + a2 + a1 + 3 * a0 */
-
-                    cipher[m] = temp_column[0];
-                    cipher[m + 1] = temp_column[1];
-                    cipher[m + 2] = temp_column[2];
-                    cipher[m + 3] = temp_column[3];
-                }
-
-           //
-           // add round key stage
-                Lp10:for (i = 0; i < AES_BLOCK_SIZE; ++i) {
-                   cipher[i] ^= keys[(j * AES_BLOCK_SIZE) + i];
-               }
-           }
-
-           //
-           // last round of AES encryption algorithm
-
-           // subtitute bytes stage
-           Lp11:for (i = 0; i < AES_BLOCK_SIZE; ++i) {
+        
+        //
+        // subtitute bytes stage
+    Lp7:for (i = 0; i < AES_BLOCK_SIZE; ++i) {
+        temp_state[i] = SBOX[cipher[i]];
+    }
+        
+        //
+        // shift rows stage
+        // row1
+        temp        = temp_state[1];
+        temp_state[1]  = temp_state[5];
+        temp_state[5]  = temp_state[9];
+        temp_state[9]  = temp_state[13];
+        temp_state[13] = temp;
+        // row2
+        temp        = temp_state[2];
+        temp_state[2]  = temp_state[10];
+        temp_state[10] = temp;
+        temp        = temp_state[6];
+        temp_state[6]  = temp_state[14];
+        temp_state[14] = temp;
+        // row3
+        temp        = temp_state[15];
+        temp_state[15] = temp_state[11];
+        temp_state[11] = temp_state[7];
+        temp_state[7]  = temp_state[3];
+        temp_state[3]  = temp;
+        
+        //
+        // mix columns stage
+    Lp8:for (m = 0; m < AES_BLOCK_SIZE; m += 4) {
+        temp_column[0] = temp_state[m];
+        temp_column[1] = temp_state[m + 1];
+        temp_column[2] = temp_state[m + 2];
+        temp_column[3] = temp_state[m + 3];
+        
+    Lp9:for (n = 0; n < AES_COL_SIZE; ++n) {
+        temp_column_a[n] = temp_column[n];
+        if (temp_column[n] & 0x80) {
+            temp_column_b[n] = (temp_column[n] << 1) ^ 0x1b;
+        } else {
+            temp_column_b[n] = (temp_column[n] << 1);
+        }
+    }
+        
+        temp_column[0] = temp_column_b[0] ^ temp_column_a[3] ^ temp_column_a[2] ^ temp_column_b[1] ^ temp_column_a[1]; /* 2 * a0 + a3 + a2 + 3 * a1 */
+        temp_column[1] = temp_column_b[1] ^ temp_column_a[0] ^ temp_column_a[3] ^ temp_column_b[2] ^ temp_column_a[2]; /* 2 * a1 + a0 + a3 + 3 * a2 */
+        temp_column[2] = temp_column_b[2] ^ temp_column_a[1] ^ temp_column_a[0] ^ temp_column_b[3] ^ temp_column_a[3]; /* 2 * a2 + a1 + a0 + 3 * a3 */
+        temp_column[3] = temp_column_b[3] ^ temp_column_a[2] ^ temp_column_a[1] ^ temp_column_b[0] ^ temp_column_a[0]; /* 2 * a3 + a2 + a1 + 3 * a0 */
+        
+        cipher[m] = temp_column[0];
+        cipher[m + 1] = temp_column[1];
+        cipher[m + 2] = temp_column[2];
+        cipher[m + 3] = temp_column[3];
+    }
+        
+        //
+        // add round key stage
+    Lp10:for (i = 0; i < AES_BLOCK_SIZE; ++i) {
+        cipher[i] ^= keys[(j * AES_BLOCK_SIZE) + i];
+    }
+    }
+        
+        //
+        // last round of AES encryption algorithm
+        
+        // subtitute bytes stage
+    Lp11:for (i = 0; i < AES_BLOCK_SIZE; ++i) {
 #pragma HLS unroll
-               cipher[i] = SBOX[cipher[i]];
-           }
-
-           // shift rows stage
-           // row1
-           temp = cipher[1];
-           cipher[1]  = cipher[5];
-           cipher[5]  = cipher[9];
-           cipher[9]  = cipher[13];
-           cipher[13] = temp;
-           // row2
-           temp        = cipher[2];
-           cipher[2]  = cipher[10];
-           cipher[10] = temp;
-           temp        = cipher[6];
-           cipher[6]  = cipher[14];
-           cipher[14] = temp;
-           // row3
-           temp        = cipher[15];
-           cipher[15] = cipher[11];
-           cipher[11] = cipher[7];
-           cipher[7]  = cipher[3];
-           cipher[3]  = temp;
-
-           // add round key stage
-           Lp12:for (i = 0; i < AES_BLOCK_SIZE; ++i) {
+        cipher[i] = SBOX[cipher[i]];
+    }
+        
+        // shift rows stage
+        // row1
+        temp = cipher[1];
+        cipher[1]  = cipher[5];
+        cipher[5]  = cipher[9];
+        cipher[9]  = cipher[13];
+        cipher[13] = temp;
+        // row2
+        temp        = cipher[2];
+        cipher[2]  = cipher[10];
+        cipher[10] = temp;
+        temp        = cipher[6];
+        cipher[6]  = cipher[14];
+        cipher[14] = temp;
+        // row3
+        temp        = cipher[15];
+        cipher[15] = cipher[11];
+        cipher[11] = cipher[7];
+        cipher[7]  = cipher[3];
+        cipher[3]  = temp;
+        
+        // add round key stage
+    Lp12:for (i = 0; i < AES_BLOCK_SIZE; ++i) {
 #pragma HLS unroll
-           cipher[i] ^= keys[160 + i]; // the last key; size = 16 bytes
-       }
-
-           //
-           // write back the cipher result
-       IO_DATA_TYPE cipherT = 0;
-       Lp13:for (i = AES_BLOCK_SIZE - 1; i > 0; --i) {
+        cipher[i] ^= keys[160 + i]; // the last key; size = 16 bytes
+    }
+        
+        //
+        // write back the cipher result
+        IO_DATA_TYPE cipherT = 0;
+    Lp13:for (i = AES_BLOCK_SIZE - 1; i > 0; --i) {
 #pragma HLS unroll
-          cipherT |= cipher[i];
-          cipherT <<= 8;
-       }
-       cipherT |= cipher[0];
-    //   gp.id = 0;
-      // gp.dest = 1;
-      // gp.last = 1;
-       //(gp.data)(127,0) = cipherT;
-       //out->write(gp);
-	
-
-    // out->packet_write((char *)cipher, 1, 4, 3);
-
+        cipherT |= cipher[i];
+        cipherT <<= 8;
+    }
+        cipherT |= cipher[0];
+        
         galapagos_packet data;
         data.dest = 4;
         data.id = 3;
@@ -321,20 +264,11 @@ void kern_enc(short id,
         data.last = 1;
         data.data = cipherT;
         out->write(data);
-
-	//printf ("\nEND OF ECRYPTION !!!!!!!!!!!!\n");
-
-   // }
-   // }
-
-	// if (flag >= 2)
-	// 	return;
+        
         flag = 24;
     }
-           else if (flag > 3) {
-        	   return;
-           }
-
-    //}
+    else if (flag > 3) {
+        return;
+    }
 }
 
