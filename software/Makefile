@@ -20,7 +20,7 @@ DEBUG_FLAGS: CXXFLAGS = $(FLAGS)  ${DEBUG_FLAGS}
 all: cpu 
 
 cpu:  cpu_node.cpp kern.cpp ../common.cpp ../util/CommandLine.cpp
-	g++-7 $(FLAGS) $(DEBUG_FLAGS) $^ -o hello_world $(BOOST_LDFLAGS)	
+	g++-7 $(FLAGS) $(DEBUG_FLAGS) $^ -o kern $(BOOST_LDFLAGS)	
 
 hls: kern.cpp generate_hls.tcl
 	vivado_hls generate_hls.tcl
